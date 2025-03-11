@@ -1,12 +1,6 @@
-import flet as ft
 import os
 import json
 
-# Define color scheme
-COLOR_PRIMARY = ft.colors.BLUE_700
-COLOR_SECONDARY = ft.colors.BLUE_500
-
-# Theme preferences constants
 PREFERENCES_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'user_preferences.json')
 
 def save_theme_preference(is_dark_mode):

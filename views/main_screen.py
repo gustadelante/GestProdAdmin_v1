@@ -1,7 +1,7 @@
 import flet as ft
 import threading
 from models.database_manager import DatabaseManager
-from utils.constants import COLOR_PRIMARY, COLOR_SECONDARY
+from utils.constants import COLOR_PRIMARY, COLOR_SECONDARY, save_theme_preference
 
 class MainScreen(ft.Container):  # Changed from ft.UserControl to ft.Container
     """
@@ -11,6 +11,12 @@ class MainScreen(ft.Container):  # Changed from ft.UserControl to ft.Container
     def __init__(self, page, db_manager=None):
         self.page = page
         self.db_manager = db_manager if db_manager else DatabaseManager()
+        
+        # Configure page properties for centered window
+        if self.page:
+            self.page.window_center = True
+            self.page.theme_mode = ft.ThemeMode.LIGHT
+            self.page.title = "Sistema Manager de Producción"
         
         # Lista para almacenar los IDs seleccionados
         self.selected_ids = []
@@ -90,6 +96,9 @@ class MainScreen(ft.Container):  # Changed from ft.UserControl to ft.Container
             on_click=self.show_add_form,
         )
         
+        # Create AppBar with menu
+        self.create_app_bar()
+        
         # Create filter row
         filter_row = ft.Row(
             controls=[
@@ -103,49 +112,32 @@ class MainScreen(ft.Container):  # Changed from ft.UserControl to ft.Container
         # Create main content
         content = ft.Column(
             controls=[
-                ft.Row(
-                    controls=[
-                        ft.Text(
-                            "Sistema Manager de Producción",
-                            color=COLOR_PRIMARY,
-                            size=20,
-                            weight=ft.FontWeight.BOLD,
-                        ),
-                        ft.Container(expand=True),
-                        self.add_button,
-                        self.delete_button,
-                        self.generate_button,
-                    ],
-                ),
+                self.app_bar,  # Add the AppBar at the top
                 ft.Divider(),
                 filter_row,
                 ft.Container(
                     content=ft.Column([
-                        self.table,  # Place the table directly in the column
+                        self.table,
                     ], expand=True, scroll=ft.ScrollMode.AUTO),
-                    expand=True,  # Make the Container expand
+                    expand=True,
                     border=ft.border.all(1, ft.colors.BLACK12),
                     border_radius=5,
                     padding=10,
-                    # Remove fixed width to allow expansion
                 ),
             ],
             spacing=10,
             expand=True,
-            # Add horizontal scroll for the entire content
             scroll=ft.ScrollMode.ALWAYS,
-            
         )
         
         # Initialize container
         super().__init__(
-            expand=True,  # Make the container expand with the window
+            expand=True,
             padding=10,
             content=content,
         )
         
-        # Register a resize event handler to update container dimensions when window resizes
-        # Use a safer approach to handle resize events
+        # Register a resize event handler
         if self.page and hasattr(self.page, 'on_resize'):
             self.page.on_resize = self.on_page_resize
         
@@ -819,3 +811,80 @@ class MainScreen(ft.Container):  # Changed from ft.UserControl to ft.Container
         self.width = self.page.width
         self.height = self.page.height
         self.update()
+
+    def create_app_bar(self):
+        """Creates the application bar with menu and theme toggle"""
+        # Create dropdown menu
+        menu_items = [
+            ft.PopupMenuItem(text="Exportar seleccionados", icon=ft.icons.FILE_DOWNLOAD, on_click=self.confirm_export),
+            ft.PopupMenuItem(text="Eliminar seleccionados", icon=ft.icons.DELETE, on_click=self.confirm_delete),
+            ft.PopupMenuItem(text="Añadir nuevo registro", icon=ft.icons.ADD, on_click=self.show_add_form),
+            ft.PopupMenuItem(),  # Divider
+            ft.PopupMenuItem(text="Acerca de", icon=ft.icons.INFO, on_click=self.show_about),
+        ]
+        
+        # Create the AppBar
+        self.app_bar = ft.Row(
+            controls=[
+                ft.PopupMenuButton(
+                    icon=ft.icons.MENU,
+                    items=menu_items,
+                ),
+                ft.Text(
+                    "Sistema Manager de Producción",
+                    color=COLOR_PRIMARY,
+                    size=20,
+                    weight=ft.FontWeight.BOLD,
+                ),
+                ft.Container(expand=True),
+                ft.IconButton(
+                    icon=ft.icons.DARK_MODE,
+                    tooltip="Cambiar tema",
+                    on_click=self.toggle_theme_mode,
+                ),
+                self.add_button,
+                self.delete_button,
+                self.generate_button,
+            ],
+            alignment=ft.MainAxisAlignment.CENTER,
+        )
+    
+    # In the toggle_theme_mode method:
+    def toggle_theme_mode(self, e):
+        """Toggle between light and dark theme"""
+        if self.page:
+            is_dark_mode = self.page.theme_mode == ft.ThemeMode.LIGHT
+            self.page.theme_mode = (
+                ft.ThemeMode.DARK 
+                if is_dark_mode
+                else ft.ThemeMode.LIGHT
+            )
+            
+            # Update icon based on current theme
+            e.control.icon = (
+                ft.icons.LIGHT_MODE 
+                if self.page.theme_mode == ft.ThemeMode.DARK 
+                else ft.icons.DARK_MODE
+            )
+            
+            # Save user preference
+            save_theme_preference(self.page.theme_mode == ft.ThemeMode.DARK)
+            
+            self.page.update()
+    
+    def show_about(self, e):
+        """Show information about the application"""
+        about_dialog = ft.AlertDialog(
+            title=ft.Text("Acerca de"),
+            content=ft.Column([
+                ft.Text("Sistema Manager de Producción"),
+                ft.Text("Versión 1.0"),
+                ft.Text("© 2023 - Todos los derechos reservados"),
+            ]),
+            actions=[
+                ft.TextButton("Cerrar", on_click=lambda _: self.close_dialog()),
+            ],
+        )
+        self.page.overlay.append(about_dialog)
+        about_dialog.open = True
+        self.page.update()
