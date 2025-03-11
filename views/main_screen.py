@@ -15,6 +15,10 @@ class MainScreen(ft.Container):  # Changed from ft.UserControl to ft.Container
         # Lista para almacenar los IDs seleccionados
         self.selected_ids = []
         
+        # Variables para el ordenamiento
+        self.sort_column_index = None
+        self.sort_ascending = True
+        
         # Definición de la tabla
         self.table = ft.DataTable(
             columns=[
@@ -22,28 +26,32 @@ class MainScreen(ft.Container):  # Changed from ft.UserControl to ft.Container
                     ft.Row([
                         ft.Checkbox(on_change=self.select_all_changed),
                         ft.Text("ID")
-                    ])
+                    ]),
+                    on_sort=lambda e: self.sort_data(0, e.ascending)
                 ),
-                ft.DataColumn(ft.Text("Turno")),
-                ft.DataColumn(ft.Text("Ancho")),
-                ft.DataColumn(ft.Text("Diámetro")),
-                ft.DataColumn(ft.Text("Gramaje")),
-                ft.DataColumn(ft.Text("Peso")),
-                ft.DataColumn(ft.Text("Bobina Num")),
-                ft.DataColumn(ft.Text("Sec")),
-                ft.DataColumn(ft.Text("OF")),
-                ft.DataColumn(ft.Text("Fecha")),
-                ft.DataColumn(ft.Text("CodCal")),
-                ft.DataColumn(ft.Text("DescCal")),
-                ft.DataColumn(ft.Text("Created At")),
+                ft.DataColumn(ft.Text("Turno"), on_sort=lambda e: self.sort_data(1, e.ascending)),
+                ft.DataColumn(ft.Text("Ancho"), on_sort=lambda e: self.sort_data(2, e.ascending)),
+                ft.DataColumn(ft.Text("Diámetro"), on_sort=lambda e: self.sort_data(3, e.ascending)),
+                ft.DataColumn(ft.Text("Gramaje"), on_sort=lambda e: self.sort_data(4, e.ascending)),
+                ft.DataColumn(ft.Text("Peso"), on_sort=lambda e: self.sort_data(5, e.ascending)),
+                ft.DataColumn(ft.Text("Bobina Num"), on_sort=lambda e: self.sort_data(6, e.ascending)),
+                ft.DataColumn(ft.Text("Sec"), on_sort=lambda e: self.sort_data(7, e.ascending)),
+                ft.DataColumn(ft.Text("OF"), on_sort=lambda e: self.sort_data(8, e.ascending)),
+                ft.DataColumn(ft.Text("Fecha"), on_sort=lambda e: self.sort_data(9, e.ascending)),
+                ft.DataColumn(ft.Text("CodCal"), on_sort=lambda e: self.sort_data(10, e.ascending)),
+                ft.DataColumn(ft.Text("DescCal"), on_sort=lambda e: self.sort_data(11, e.ascending)),
+                ft.DataColumn(ft.Text("Created At"), on_sort=lambda e: self.sort_data(12, e.ascending)),
             ],
-            rows=[]
+            rows=[],
+            sort_column_index=self.sort_column_index,
+            sort_ascending=self.sort_ascending,
+            expand=True,  # Add expand property to the table
         )
         
         # Elementos de búsqueda/filtro
         self.search_fields = {}
-        for column in ["id", "turno", "ancho", "diametro", "gramaje", "peso", 
-                      "bobina_num", "sec", "of", "fecha", "codcal", "desccal", "created_at"]:
+        # Only include the specified columns for filtering
+        for column in ["of", "fecha", "codcal", "created_at"]:
             self.search_fields[column] = ft.TextField(
                 hint_text=f"Buscar {column}",
                 border=ft.InputBorder.UNDERLINE,
@@ -86,8 +94,7 @@ class MainScreen(ft.Container):  # Changed from ft.UserControl to ft.Container
         filter_row = ft.Row(
             controls=[
                 self.search_fields[col] for col in [
-                    "id", "turno", "ancho", "diametro", "gramaje", "peso", 
-                    "bobina_num", "sec", "of", "fecha", "codcal", "desccal", "created_at"
+                    "of", "fecha", "codcal", "created_at"
                 ]
             ],
             scroll=ft.ScrollMode.AUTO
@@ -114,13 +121,13 @@ class MainScreen(ft.Container):  # Changed from ft.UserControl to ft.Container
                 filter_row,
                 ft.Container(
                     content=ft.Column([
-                        self.table
-                    ]),
-                    expand=True,
+                        self.table,  # Place the table directly in the column
+                    ], expand=True, scroll=ft.ScrollMode.AUTO),
+                    expand=True,  # Make the Container expand
                     border=ft.border.all(1, ft.colors.BLACK12),
                     border_radius=5,
-                    padding=10,                  
-                    
+                    padding=10,
+                    # Remove fixed width to allow expansion
                 ),
             ],
             spacing=10,
@@ -132,12 +139,15 @@ class MainScreen(ft.Container):  # Changed from ft.UserControl to ft.Container
         
         # Initialize container
         super().__init__(
-            width=page.width,
-            height=page.height,
+            expand=True,  # Make the container expand with the window
             padding=10,
             content=content,
-            # Remove the scroll parameter from here
         )
+        
+        # Register a resize event handler to update container dimensions when window resizes
+        # Use a safer approach to handle resize events
+        if self.page and hasattr(self.page, 'on_resize'):
+            self.page.on_resize = self.on_page_resize
         
         # Don't load data immediately, wait until component is fully mounted
         # self.load_data()  # Comment out or remove this line
@@ -721,3 +731,91 @@ class MainScreen(ft.Container):  # Changed from ft.UserControl to ft.Container
         
         # Recargar los datos
         self.load_data()
+
+    def sort_data(self, column_index, ascending):
+        """Ordena los datos según la columna seleccionada."""
+        self.sort_column_index = column_index
+        self.sort_ascending = ascending
+        self.table.sort_column_index = column_index
+        self.table.sort_ascending = ascending
+        
+        # Obtener los datos actuales
+        current_data = []
+        for row in self.table.rows:
+            row_data = {}
+            # Extraer el ID del checkbox
+            checkbox = row.cells[0].content.controls[0]
+            row_data["id"] = checkbox.data
+            
+            # Extraer los valores de las celdas
+            for i, cell in enumerate(row.cells):
+                if i == 0:  # Para la columna ID
+                    row_data["id_text"] = cell.content.controls[1].value
+                else:
+                    # Usar índices para los demás campos
+                    row_data[f"column_{i}"] = cell.content.value
+            
+            current_data.append(row_data)
+        
+        # Definir la clave de ordenamiento
+        if column_index == 0:
+            sort_key = "id"
+        else:
+            sort_key = f"column_{column_index}"
+        
+        # Ordenar los datos
+        sorted_data = sorted(
+            current_data, 
+            key=lambda x: self._get_sort_value(x.get(sort_key, "")), 
+            reverse=not ascending
+        )
+        
+        # Actualizar la tabla con los datos ordenados
+        self.table.rows.clear()
+        for item in sorted_data:
+            checkbox = ft.Checkbox(
+                value=item["id"] in self.selected_ids, 
+                data=item["id"],
+                on_change=self.checkbox_changed
+            )
+            
+            self.table.rows.append(
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Row([checkbox, ft.Text(str(item["id_text"]))])),
+                        ft.DataCell(ft.Text(item.get("column_1", ""))),
+                        ft.DataCell(ft.Text(item.get("column_2", ""))),
+                        ft.DataCell(ft.Text(item.get("column_3", ""))),
+                        ft.DataCell(ft.Text(item.get("column_4", ""))),
+                        ft.DataCell(ft.Text(item.get("column_5", ""))),
+                        ft.DataCell(ft.Text(item.get("column_6", ""))),
+                        ft.DataCell(ft.Text(item.get("column_7", ""))),
+                        ft.DataCell(ft.Text(item.get("column_8", ""))),
+                        ft.DataCell(ft.Text(item.get("column_9", ""))),
+                        ft.DataCell(ft.Text(item.get("column_10", ""))),
+                        ft.DataCell(ft.Text(item.get("column_11", ""))),
+                        ft.DataCell(ft.Text(item.get("column_12", ""))),
+                    ]
+                )
+            )
+        
+        self.update()
+    
+    def _get_sort_value(self, value):
+        """Obtiene el valor para ordenamiento, convirtiendo a número si es posible."""
+        if value is None:
+            return ""
+        
+        # Intentar convertir a número para ordenamiento numérico
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            # Si no es un número, devolver como string para ordenamiento alfabético
+            return str(value).lower()
+
+    def on_page_resize(self, e):
+        """Handle window resize events"""
+        # Update the container to fill the new window size
+        self.width = self.page.width
+        self.height = self.page.height
+        self.update()

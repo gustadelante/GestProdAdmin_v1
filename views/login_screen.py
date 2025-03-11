@@ -96,6 +96,9 @@ class LoginScreen(ft.Container):
             alignment=ft.alignment.center,
             content=content_column
         )
+        
+        # Set focus to username field when the screen loads
+        self.username_field.autofocus = True
     
     def try_login(self, e):
         """Intenta iniciar sesión con las credenciales proporcionadas."""
