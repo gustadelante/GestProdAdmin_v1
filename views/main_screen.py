@@ -10,7 +10,13 @@ class MainScreen(ft.Container):  # Changed from ft.UserControl to ft.Container
     """
     def __init__(self, page, db_manager=None):
         self.page = page
-        self.db_manager = db_manager if db_manager else DatabaseManager()
+        
+        # Initialize database manager with proper path handling
+        if db_manager:
+            self.db_manager = db_manager
+        else:
+            from models.database_manager import DatabaseManager
+            self.db_manager = DatabaseManager()
         
         # Configure page properties for centered window
         if self.page:
@@ -358,10 +364,19 @@ class MainScreen(ft.Container):  # Changed from ft.UserControl to ft.Container
                 # Exportar a un archivo CSV
                 import csv
                 import os
+                import sys
                 from datetime import datetime
                 
+                # Determine application path
+                if getattr(sys, 'frozen', False):
+                    # If the application is run as a bundle (pyinstaller)
+                    application_path = os.path.dirname(sys.executable)
+                else:
+                    # If the application is run as a script
+                    application_path = os.path.dirname(os.path.dirname(__file__))
+                
                 # Crear directorio de exportación si no existe
-                export_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'exports')
+                export_dir = os.path.join(application_path, 'exports')
                 os.makedirs(export_dir, exist_ok=True)
                 
                 # Generar nombre de archivo con timestamp

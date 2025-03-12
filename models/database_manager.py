@@ -1,21 +1,33 @@
-import sqlite3
 import os
+import sqlite3
+import sys
 
 class DatabaseManager:
-    """
-    Clase para gestionar la conexión y operaciones con la base de datos.
-    """
-    def __init__(self, db_path=None):
-        # Set default database path if not provided
-        self.db_path = db_path if db_path else os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'produccion.db')
-        
-        # Ensure the directory exists
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-        
-        # Initialize database if it doesn't exist
-        self._init_db()
+    """Clase para gestionar la conexión y operaciones con la base de datos."""
     
-    def _init_db(self):
+    def __init__(self):
+        """Inicializa el gestor de base de datos."""
+        # Determine if we're running as a script or frozen executable
+        if getattr(sys, 'frozen', False):
+            # If the application is run as a bundle (pyinstaller)
+            application_path = os.path.dirname(sys.executable)
+        else:
+            # If the application is run as a script
+            application_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        # Ensure data directory exists
+        data_dir = os.path.join(application_path, 'data')
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
+        
+        # Set database path
+        self.db_path = os.path.join(data_dir, 'produccion.db')
+        print(f"Database path: {self.db_path}")
+        
+        # Create database if it doesn't exist
+        self._create_database_if_not_exists()
+    
+    def _create_database_if_not_exists(self):
         """Initialize the database with required tables if they don't exist."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

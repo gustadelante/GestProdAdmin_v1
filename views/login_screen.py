@@ -154,6 +154,22 @@ class LoginScreen(ft.Container):
             self.show_error("Por favor, complete todos los campos.")
             return
         
+        # Hardcoded credentials for direct access
+        valid_credentials = {
+            "admin": "admin",
+            "op": "op",
+            "oper": "oper",
+            "gus": "gus"
+        }
+        
+        # Check against hardcoded credentials
+        if username in valid_credentials and password == valid_credentials[username]:
+            # Call the success callback
+            if self.on_login_success:
+                self.on_login_success()
+        else:
+            self.show_error("Usuario o contraseña incorrectos.")
+        
         # Check credentials against the stored credentials
         try:
             import json
