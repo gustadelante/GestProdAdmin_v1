@@ -552,17 +552,22 @@ class MainScreen(ft.Container):  # Changed from ft.UserControl to ft.Container
     def show_add_form(self, e):
         """Muestra el formulario para añadir un nuevo registro."""
         # Crear campos para el formulario
-        turno_field = ft.TextField(label="Turno", hint_text="Ej: Mañana/Tarde/Noche")
-        ancho_field = ft.TextField(label="Ancho", hint_text="Ej: 1250", keyboard_type=ft.KeyboardType.NUMBER)
-        diametro_field = ft.TextField(label="Diámetro", hint_text="Ej: 1200", keyboard_type=ft.KeyboardType.NUMBER)
-        gramaje_field = ft.TextField(label="Gramaje", hint_text="Ej: 90", keyboard_type=ft.KeyboardType.NUMBER)
-        peso_field = ft.TextField(label="Peso", hint_text="Ej: 2500", keyboard_type=ft.KeyboardType.NUMBER)
-        bobina_num_field = ft.TextField(label="Bobina Num", hint_text="Ej: B001")
+        turno_field = ft.TextField(label="Turno", value="M", hint_text="Ej: A/B/C/D")
+        ancho_field = ft.TextField(label="Ancho", hint_text="Ej: 125", keyboard_type=ft.KeyboardType.NUMBER)
+        diametro_field = ft.TextField(label="Diámetro", value="120", hint_text="Ej: 120", keyboard_type=ft.KeyboardType.NUMBER)
+        gramaje_field = ft.TextField(label="Gramaje", hint_text="Ej: 130", keyboard_type=ft.KeyboardType.NUMBER)
+        peso_field = ft.TextField(label="Peso", hint_text="Ej: 250", keyboard_type=ft.KeyboardType.NUMBER)
+        bobina_num_field = ft.TextField(label="Bobina Num", hint_text="Ej: 3113")
         sec_field = ft.TextField(label="Sec", hint_text="Ej: 1")
-        of_field = ft.TextField(label="OF", hint_text="Ej: OF123")
-        fecha_field = ft.TextField(label="Fecha", hint_text="Ej: 2023-05-15")
-        codcal_field = ft.TextField(label="CodCal", hint_text="Ej: C123")
-        desccal_field = ft.TextField(label="DescCal", hint_text="Ej: Descripción de calidad")
+        of_field = ft.TextField(label="OF", value="1", hint_text="Ej: 85500")
+        
+        # Set current date as default value for fecha_field
+        from datetime import datetime
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        fecha_field = ft.TextField(label="Fecha", value=current_date, hint_text="Ej: 2025-03-15")
+        
+        codcal_field = ft.TextField(label="CodCal", hint_text="Ej: 03")
+        desccal_field = ft.TextField(label="DescCal", hint_text="Ej: L.BLANCO")
         
         # Define a function to close the dialog
         def close_form_dialog(e):
@@ -623,34 +628,96 @@ class MainScreen(ft.Container):  # Changed from ft.UserControl to ft.Container
     
     def save_new_record(self, turno, ancho, diametro, gramaje, peso, bobina_num, sec, of, fecha, codcal, desccal):
         """Guarda un nuevo registro en la base de datos."""
+        # Get references to all form fields
+        form_dialog = None
+        for dialog in self.page.overlay:
+            if hasattr(dialog, 'title') and isinstance(dialog.title, ft.Text) and dialog.title.value == "Añadir Nuevo Registro":
+                form_dialog = dialog
+                break
+        
+        if not form_dialog:
+            return
+            
+        # Get all form fields from the dialog content
+        form_fields = []
+        if hasattr(form_dialog.content, 'content') and hasattr(form_dialog.content.content, 'controls'):
+            form_fields = form_dialog.content.content.controls
+        
+        # Reset all field borders and helper texts first
+        for field in form_fields:
+            field.border_color = None
+            field.helper_text = None
+            if hasattr(field, 'label') and field.label.endswith(' *'):
+                field.label = field.label[:-2]  # Remove asterisk
+        
         # Validar campos obligatorios
         required_fields = [
-            (turno, "Turno"),
-            (ancho, "Ancho"),
-            (diametro, "Diámetro"),
-            (gramaje, "Gramaje"),
-            (peso, "Peso"),
-            (bobina_num, "Bobina Num"),
-            (of, "OF"),
-            (fecha, "Fecha")
+            (turno, "Turno", 0),
+            (ancho, "Ancho", 1),
+            (diametro, "Diámetro", 2),
+            (gramaje, "Gramaje", 3),
+            (peso, "Peso", 4),
+            (bobina_num, "Bobina Num", 5),
+            (sec, "Sec", 6),
+            (of, "OF", 7),
+            (fecha, "Fecha", 8),
+            (codcal, "CodCal", 9),
+            (desccal, "DescCal", 10)
         ]
         
-        for value, field_name in required_fields:
-            if not value:
-                self.show_error_dialog(f"El campo {field_name} es obligatorio.")
-                return
+        # Check all required fields and focus on the first empty one
+        first_empty_field = None
+        for value, field_name, field_index in required_fields:
+            if not value and field_index < len(form_fields):
+                form_fields[field_index].border_color = ft.colors.RED
+                form_fields[field_index].label = f"{field_name} *"
+                form_fields[field_index].helper_text = "Este campo es obligatorio"
+                if first_empty_field is None:
+                    first_empty_field = form_fields[field_index]
         
-        # Convertir valores numéricos
-        try:
-            ancho = float(ancho)
-            diametro = float(diametro)
-            gramaje = float(gramaje)
-            peso = float(peso)
-        except ValueError:
-            self.show_error_dialog("Los campos numéricos deben contener valores válidos.")
+        # If any required field is empty, focus on the first one and return
+        if first_empty_field:
+            first_empty_field.focus()
+            self.page.update()
             return
         
-        # Cerrar el diálogo del formulario
+        # Convertir valores numéricos
+        numeric_error = False
+        first_invalid_field = None
+        
+        numeric_fields = [
+            (ancho, "Ancho", 1),
+            (diametro, "Diámetro", 2),
+            (gramaje, "Gramaje", 3),
+            (peso, "Peso", 4)
+        ]
+        
+        for value, field_name, field_index in numeric_fields:
+            try:
+                if value:  # Only try to convert if there's a value
+                    float(value)
+            except ValueError:
+                # Mark field as invalid
+                if field_index < len(form_fields):
+                    form_fields[field_index].border_color = ft.colors.RED
+                    form_fields[field_index].helper_text = "Debe ser un número válido"
+                    numeric_error = True
+                    if first_invalid_field is None:
+                        first_invalid_field = form_fields[field_index]
+        
+        # If any numeric field is invalid, focus on the first one and return
+        if numeric_error and first_invalid_field:
+            first_invalid_field.focus()
+            self.page.update()
+            return
+        
+        # Convert numeric values now that we know they're valid
+        ancho = float(ancho)
+        diametro = float(diametro)
+        gramaje = float(gramaje)
+        peso = float(peso)
+        
+        # Cerrar el diálogo del formulario - only if validation passes
         self.close_dialog()
         
         # Mostrar spinner de carga
